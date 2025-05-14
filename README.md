@@ -48,7 +48,7 @@ This Go application checks whether a given IP address or a /24 subnet is blackli
 The application supports the following input formats:
 
 - **Single IP address:** Provide an IP address as an argument. The format should be in the standard IPv4 format (e.g., `218.92.0.211`).
-- **/24 Subnet:** Provide a subnet in CIDR format (e.g., `218.92.0/24`). Only `/24` subnets are supported.
+- **/24 Subnet:** Provide a subnet in CIDR format (e.g., `218.92.0.0/24`). Only `/24` subnets are supported.
 
 ### Example Commands
 
