@@ -204,8 +204,6 @@ Example:
    
 2. **Non-Commercial Use**: You may not use this project for commercial purposes. This means you cannot sell, offer for sale, or use the project in any manner that is intended for commercial gain or financial benefit.
 
-3. **No Derivatives**: You may not alter, transform, or build upon the project. Modifying the project or using it as a basis for any new work is prohibited. This includes adapting, translating, or creating derivative works.
+3. **No Commercial Use of Derivatives**: Even if you receive permission to modify the project, you are prohibited from using the modified project for commercial purposes unless explicitly authorized by the project’s creators.
 
-4. **No Commercial Use of Derivatives**: Even if you receive permission to modify the project, you are prohibited from using the modified project for commercial purposes unless explicitly authorized by the project’s creators.
-
-5. **Attribution**: If you use the project, you must provide appropriate attribution to the original authors. You may not imply that the authors endorse your use of the project.
+4. **Attribution**: If you use the project, you must provide appropriate attribution to the original authors. You may not imply that the authors endorse your use of the project.
