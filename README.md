@@ -1,202 +1,95 @@
 
 # Blacklist Checker
 
-## Overview
-
-This Go application checks whether a given IP address or a /24 subnet is blacklisted across multiple DNS-based blacklists. The application takes either a single IP address or a /24 subnet as input and outputs the blacklisted IPs into a JSON file.
+A high-performance DNS-based blackhole list (DNSBL) checker written in Go. This tool checks if IP addresses or /24 subnets are listed in various DNSBLs.
 
 ## Features
 
-- Supports both single IP addresses and /24 subnets as input.
-- Checks IPs against a wide range of DNS-based blacklists.
-- Outputs the results in a JSON format, grouped by IP address with their corresponding blacklists.
-- Handles concurrent DNS lookups with a limit on the number of concurrent requests.
-- Supports automatic generation of output filenames with timestamps.
-
-## Prerequisites
-
-- Go version 1.16 or higher.
-- Access to the internet to perform DNS lookups.
+- Check individual IP addresses or /24 subnets
+- Configurable concurrency and timeout settings
+- Support for custom DNSBL lists
+- Multiple output formats (JSON and text)
+- Detailed error reporting
+- Performance optimized DNS lookups
+- Configurable through command-line flags and config file
 
 ## Installation
 
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/alptekisunnetci/blacklist-checker.git
-   cd blacklist-checker
-   ```
-
-2. **Build the Go application:**
-
-   ```bash
-   go build -o blacklist_checker main.go
-   ```
-
-3. **Run the application:**
-
-   ```bash
-   ./blacklist_checker <IP> or <subnet/24>
-   ```
-
-   Replace `<IP>` with the IP address or `<subnet/24>` with the subnet you want to check. For example:
-   - `./blacklist_checker 218.92.0.211`
-   - `./blacklist_checker 218.92.0.0/24`
+```bash
+git clone https://github.com/alptekinsunnetci/blacklist-checker.git
+cd blacklist-checker
+go build
+```
 
 ## Usage
 
-The application supports the following input formats:
+Basic usage:
+```bash
+./blacklist-checker <IP> or <subnet/24>
+```
 
-- **Single IP address:** Provide an IP address as an argument. The format should be in the standard IPv4 format (e.g., `218.92.0.211`).
-- **/24 Subnet:** Provide a subnet in CIDR format (e.g., `218.92.0.0/24`). Only `/24` subnets are supported.
+With options:
+```bash
+./blacklist-checker -config custom_config.json -format text <IP> or <subnet/24>
+```
 
-### Example Commands
+### Command-line Options
 
-- Checking a single IP address:
-  
-  ```bash
-  ./blacklist_checker 218.92.0.211
-  ```
+- `-config`: Path to configuration file (default: config.json)
+- `-format`: Output format (json or text, default: json)
 
-- Checking a subnet:
+### Configuration File
 
-  ```bash
-  ./blacklist_checker 218.92.0.0/24
-  ```
-
-## Output
-
-- The application generates a JSON file with the results of the blacklist check.
-- The output file is named in the format `subnet_or_ip_timestamp.json`, where `subnet_or_ip` is the provided input (with `/` replaced by `-`), and `timestamp` is the current timestamp.
-
-Example filename: `218.92.0.0-24_20230514_153000.json`
-
-### JSON Output Structure
-
-The JSON output will contain a list of IPs as keys, with their respective blacklists as values.
-
-Example:
+The configuration file (config.json) supports the following options:
 
 ```json
 {
-  "218.92.0.1": [
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.220": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.221": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.222": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.223": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.224": [
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.225": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.226": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.227": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.228": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.229": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.230": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.231": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.232": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.233": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.234": [
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.235": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.236": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.237": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.252": [
-    "dnsbl-1.uceprotect.net",
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.52": [
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org"
-  ],
-  "218.92.0.53": [
-    "dnsbl-2.uceprotect.net",
-    "dnsbl.dronebl.org",
-    "rbl.rtbh.com.tr"
-  ],
-  "218.92.0.56": [
+  "concurrency": 100,
+  "timeout": 3,
+  "blacklists": [
+    "access.redhawk.org",
     "b.barracudacentral.org",
-    "dnsbl-2.uceprotect.net",
-    "rbl.rtbh.com.tr"
+    ...
   ],
-  "218.92.0.57": [
-    "dnsbl-2.uceprotect.net"
-  ],
-  "218.92.0.99": [
-    "dnsbl-2.uceprotect.net",
-    "rbl.rtbh.com.tr"
+  "output_format": "json",
+  "custom_blacklists": []
+}
+```
+
+## Output
+
+The tool generates a timestamped output file in the specified format. The filename follows the pattern:
+`<IP-or-subnet>_<timestamp>.<format>`
+
+### JSON Output Example
+```json
+{
+  "192.168.1.1": [
+    "dnsbl.sorbs.net",
+    "bl.spamcop.net"
   ]
 }
 ```
 
-## Concurrency and Performance
+### Text Output Example
+```
+IP: 192.168.1.1
+Blacklisted in:
+  - dnsbl.sorbs.net
+  - bl.spamcop.net
+```
 
-- The application uses goroutines to perform concurrent DNS lookups, with a limit on the number of concurrent requests (`50` by default).
-- You can adjust the concurrency by modifying the `concurrency` variable in the `main` function.
+## Performance
+
+The tool is optimized for performance with:
+- Configurable concurrency limits
+- Efficient DNS lookups
+- Goroutine-based parallel processing
+- Memory-efficient result collection
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
