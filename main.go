@@ -4,170 +4,107 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
+	"flag"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"blacklist-check/pkg/config"
+	"blacklist-check/pkg/dnsbl"
+	"blacklist-check/pkg/utils"
 )
 
-type BlacklistResult struct {
-	IP        string
-	Blacklist string
-}
-
-var blacklists = []string{
-	"access.redhawk.org",
-	"b.barracudacentral.org",
-	"bl.spamcop.net",
-	"blackholes.mail-abuse.org",
-	"bogons.cymru.com",
-	"cdl.anti-spam.org.cn",
-	"db.wpbl.info",
-	"dnsbl-1.uceprotect.net",
-	"dnsbl-2.uceprotect.net",
-	"dnsbl.dronebl.org",
-	"dnsbl.sorbs.net",
-	"drone.abuse.ch",
-	"dul.dnsbl.sorbs.net",
-	"http.dnsbl.sorbs.net",
-	"httpbl.abuse.ch",
-	"ips.backscatterer.org",
-	"ix.dnsbl.manitu.net",
-	"multi.surbl.org",
-	"netblock.pedantic.org",
-	"psbl.surriel.com",
-	"query.senderbase.org",
-	"rbl-plus.mail-abuse.org",
-	"rbl.efnetrbl.org",
-	"rbl.spamlab.com",
-	"relays.mail-abuse.org",
-	"short.rbl.jp",
-	"smtp.dnsbl.sorbs.net",
-	"socks.dnsbl.sorbs.net",
-	"spam.dnsbl.sorbs.net",
-	"spamguard.leadmon.net",
-	"spamrbl.imp.ch",
-	"ubl.unsubscore.com",
-	"web.dnsbl.sorbs.net",
-	"wormrbl.imp.ch",
-	"zombie.dnsbl.sorbs.net",
-	"rbl.rtbh.com.tr",
-}
-
-func parseInput(arg string) ([]string, string, error) {
-	if !strings.Contains(arg, "/") {
-		ip := net.ParseIP(arg)
-		if ip == nil || ip.To4() == nil {
-			return nil, "", fmt.Errorf("Invalid IP address: %s", arg)
-		}
-		return []string{ip.String()}, ip.String(), nil
-	}
-
-	ip, ipNet, err := net.ParseCIDR(arg)
-	if err != nil {
-		return nil, "", fmt.Errorf("Invalid subnet format: %s", arg)
-	}
-
-	ones, bits := ipNet.Mask.Size()
-	if bits != 32 || ones != 24 {
-		return nil, "", fmt.Errorf("Only /24 subnet is supported")
-	}
-
-	var ips []string
-	base := ip.To4()
-	for i := 0; i < 256; i++ {
-		ips = append(ips, fmt.Sprintf("%d.%d.%d.%d", base[0], base[1], base[2], i))
-	}
-	return ips, ipNet.String(), nil
-}
-
-func reverseIP(ip string) string {
-	parts := strings.Split(ip, ".")
-	if len(parts) != 4 {
-		return ""
-	}
-	return fmt.Sprintf("%s.%s.%s.%s", parts[3], parts[2], parts[1], parts[0])
-}
-
-func checkBlacklist(ip string, wg *sync.WaitGroup, sem chan struct{}, resultChan chan BlacklistResult) {
-	defer wg.Done()
-	sem <- struct{}{}
-
-	resolver := net.Resolver{PreferGo: true}
-	reversed := reverseIP(ip)
-
-	for _, bl := range blacklists {
-		fqdn := fmt.Sprintf("%s.%s", reversed, bl)
-		fmt.Printf("Checking %s against %s...\n", ip, bl)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		_, err := resolver.LookupHost(ctx, fqdn)
-		cancel()
-
-		if err == nil {
-			resultChan <- BlacklistResult{IP: ip, Blacklist: bl}
-		}
-	}
-
-	<-sem
-}
-
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: ./blacklist_checker <IP> or <subnet/24>")
-		os.Exit(1)
-	}
+	// Parse command line flags
+	configPath := flag.String("config", "config.json", "Path to configuration file")
+	outputFormat := flag.String("format", "json", "Output format (json or text)")
+	flag.Parse()
 
-	ipsToCheck, subnetOrIP, err := parseInput(os.Args[1])
+	// Load configuration
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Override output format if specified
+	if *outputFormat != "" {
+		cfg.OutputFormat = *outputFormat
+	}
+
+	// Check if IP/subnet argument is provided
+	if len(flag.Args()) != 1 {
+		fmt.Println("Usage: blacklist-checker [options] <IP> or <subnet/24>")
+		fmt.Println("\nOptions:")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// Parse input
+	ipsToCheck, subnetOrIP, err := utils.ParseInput(flag.Arg(0))
+	if err != nil {
+		fmt.Printf("Error parsing input: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create checker
+	checker := dnsbl.NewChecker(cfg)
+	defer checker.Close()
+
+	// Setup concurrency control
 	var wg sync.WaitGroup
-	concurrency := 50
-	sem := make(chan struct{}, concurrency)
-	resultChan := make(chan BlacklistResult, 256)
+	sem := make(chan struct{}, cfg.Concurrency)
 
-	grouped := make(map[string][]string)
-
+	// Start result collector
+	results := make(map[string][]string)
 	go func() {
-		for res := range resultChan {
-			grouped[res.IP] = append(grouped[res.IP], res.Blacklist)
+		for result := range checker.GetResultChan() {
+			if result.Error != "" {
+				fmt.Printf("Error checking %s: %s\n", result.IP, result.Error)
+				continue
+			}
+			results[result.IP] = append(results[result.IP], result.Blacklist)
 		}
 	}()
 
+	// Start checking IPs
+	fmt.Printf("Checking %d IPs against %d blacklists...\n", len(ipsToCheck), len(cfg.Blacklists))
+	startTime := time.Now()
+
 	for _, ip := range ipsToCheck {
 		wg.Add(1)
-		go checkBlacklist(ip, &wg, sem, resultChan)
+		go checker.CheckIP(ip, &wg, sem)
 	}
 
 	wg.Wait()
-	close(resultChan)
 
-	if len(grouped) == 0 {
+	// Format and save results
+	if len(results) == 0 {
 		fmt.Println("No blacklisted IPs found.")
 		return
 	}
 
-	jsonData, err := json.MarshalIndent(grouped, "", "  ")
+	formattedResults, err := utils.FormatResults(results, cfg.OutputFormat)
 	if err != nil {
-		fmt.Println("JSON error:", err)
-		return
+		fmt.Printf("Error formatting results: %v\n", err)
+		os.Exit(1)
 	}
 
+	// Save results to file
 	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("%s_%s.json", strings.ReplaceAll(subnetOrIP, "/", "-"), timestamp)
+	filename := fmt.Sprintf("%s_%s.%s",
+		strings.ReplaceAll(subnetOrIP, "/", "-"),
+		timestamp,
+		cfg.OutputFormat)
 
-	err = os.WriteFile(filename, jsonData, 0644)
-	if err != nil {
-		fmt.Println("File write error:", err)
-		return
+	if err := os.WriteFile(filename, []byte(formattedResults), 0644); err != nil {
+		fmt.Printf("Error saving results: %v\n", err)
+		os.Exit(1)
 	}
 
-	fmt.Printf("Blacklisted IPs written to %s\n", filename)
+	duration := time.Since(startTime)
+	fmt.Printf("Check completed in %v\n", duration)
+	fmt.Printf("Results saved to %s\n", filename)
 }
