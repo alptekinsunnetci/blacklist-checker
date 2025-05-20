@@ -1,5 +1,6 @@
 // Alptekin Sünnetci (C) 2025
 // This program checks if a given IP address or a /24 subnet is blacklisted in various DNS-based blackhole lists (DNSBLs).
+// blacklist-checker v.1.1
 
 package main
 
